@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saving Teeworlds — Build 0.4 Enemy AI</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080b13;color:#eef4ff;font:15px system-ui,Segoe UI,Arial;display:grid;place-items:center;min-height:100vh}
+main{width:min(1100px,99vw);padding:10px}header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:clamp(18px,3vw,28px);letter-spacing:3px;margin:6px 0 10px}
+#tag{font-size:11px;color:#a8bbd4;letter-spacing:1px}
+canvas{width:100%;height:auto;display:block;border:2px solid #536681;border-radius:10px;background:#101827;image-rendering:pixelated;box-shadow:0 14px 50px #000a}
+#help{font-size:12px;color:#b5c5dc;line-height:1.6;margin:8px 2px}
+kbd{background:#26364c;border:1px solid #50627c;border-radius:4px;padding:1px 5px;color:white}
+.overlay{position:fixed;inset:0;z-index:5;background:#03060beF;display:grid;place-items:center;padding:16px}
+.panel{width:min(650px,96vw);background:#111c2d;border:1px solid #637b9b;border-radius:12px;padding:22px;box-shadow:0 24px 80px #000}
+.panel h2{margin:0 0 12px;color:#ff7183;letter-spacing:2px}
+.panel p{line-height:1.55;color:#d4e0f1}
+button,input{font:inherit;border-radius:7px;border:1px solid #6e84a1;padding:10px 12px;background:#21324a;color:white}
+button{background:#a72f49;border-color:#e45b70;font-weight:800;cursor:pointer}
+button:hover{filter:brightness(1.15)}input{width:100%;margin:8px 0}
+.small{font-size:12px;color:#9eb2ce}.hide{display:none!important}
+#admin{position:fixed;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);width:min(450px,94vw);background:#080d17f5;border:2px solid #e34d62;border-radius:10px;padding:16px;display:none;box-shadow:0 20px 80px #000}
+#admin h3{margin:0 0 8px;color:#ff7183}#adminLog{height:110px;overflow:auto;background:#03060b;padding:8px;font:12px monospace;color:#9de6ad;white-space:pre-wrap;margin:8px 0}
+#adminInput{font:13px monospace}
+#pauseMenu{z-index:8}#pauseMenu .panel{max-width:520px;text-align:center}#pauseMenu button,#settingsPanel button{min-width:190px;margin:6px}#settingsPanel{margin-top:14px;padding-top:12px;border-top:1px solid #40536e}#settingsPanel p{margin:8px 0}
+</style></head>
+<body><main>
+<header><h1>SAVING TEEWORLDS</h1><div id="tag">BUILD 0.5 · PAUSE MENU</div></header>
+<canvas id="game" width="960" height="540"></canvas>
+<div id="help"><b>Move:</b> <kbd>A</kbd>/<kbd>D</kbd> or arrows · <b>Jump:</b> <kbd>Space</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> · <b>Shoot:</b> Left click / <kbd>J</kbd> / controller <kbd>R2</kbd> (auto-locks nearest enemy; locks Hacker during boss) · <b>Teeworlds hook:</b> Hold Right click / <kbd>K</kbd> to manually aim the hook; controller <kbd>L2</kbd> auto-locks onto a reachable wall/platform; release to retract · <b>Pause:</b> <kbd>ESC</kbd> / controller X or button 3 · <b>Admin:</b> <kbd>F8</kbd>. Gamepad left stick/D-pad moves, A/Cross jumps, R2 auto-locks and shoots the nearest enemy (Hacker during boss), L2 auto-locks the hook onto nearby terrain.</div>
+</main>
+
+<div class="overlay" id="intro"><div class="panel">
+<h2>SAVING TEEWORLDS</h2>
+<p>The Oldest One, the Missing One and the Mystery One are hanging out in Teeworlds.</p>
+<p>A corrupted Hacker suddenly appears:</p>
+<p style="color:#ff6b80;font-weight:900;letter-spacing:1px">L3AVE THE GAME NOW OR YOU W166 BE HACKED.</p>
+<p>They refuse and run. The Hacker flies after them, catches two of them, and the screen goes dark.</p>
+<p><b>You are the Oldest One.</b> Fight through the corrupted world, rescue your friends, defeat the Hacker and ban him.</p>
+<button id="start">START THE MISSION</button>
+<p class="small">Build 0.5: pause menu, settings, leave and restart. Enemies patrol, shoot and grapple every 3 seconds.</p>
+</div></div>
+
+<div class="overlay hide" id="pauseMenu"><div class="panel">
+<h2 id="pauseTitle">GAME PAUSED</h2>
+<div id="pauseMain"><p>The world is waiting for you.</p>
+<button id="resumeGame">RESUME</button><br>
+<button id="openSettings">SETTINGS</button><br>
+<button id="leaveGame">LEAVE GAME</button><br>
+<button id="restartGame">RESTART</button>
+<p class="small">Press ESC, controller X, or controller button 3 to resume.</p></div>
+<div id="settingsPanel" class="hide"><h3>SETTINGS</h3><p>Controls</p><p class="small">Move: A/D or arrows · Jump: Space · Shoot: J / Left Click / R2 · Hook: K / Right Click / L2</p><button id="toggleHints">HIDE CONTROL HINTS</button><br><button id="backSettings">BACK</button></div>
+</div></div>
+
+<div id="admin"><h3>OWNER ADMIN CONSOLE</h3><div class="small">Enter the admin password.</div>
+<input id="adminPass" type="password" placeholder="Admin password" autocomplete="off"><button id="unlock">UNLOCK</button>
+<div id="adminTools" class="hide"><div id="adminLog">ACCESS GRANTED. Type help.</div><input id="adminInput" placeholder="help"><button id="runCommand">RUN COMMAND</button></div>
+<div class="small">F8 closes this console. Local prototype only; this is not real online account security.</div></div>
+
+<div class="overlay hide" id="ending"><div class="panel">
+<h2 id="endingTitle">TEE WORLDS SAVED</h2><p id="endingText"></p><button id="continueEnd">CONTINUE</button>
+</div></div>
+
+<script>
+(()=> {
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height;
+const intro=document.getElementById("intro"),admin=document.getElementById("admin"),ending=document.getElementById("ending"),pauseMenu=document.getElementById("pauseMenu"),pauseMain=document.getElementById("pauseMain"),settingsPanel=document.getElementById("settingsPanel");
+const pass=document.getElementById("adminPass"),adminTools=document.getElementById("adminTools"),adminLog=document.getElementById("adminLog"),adminInput=document.getElementById("adminInput");
+const keys=Object.create(null);
+let mode="intro",dialogue=null,dialogueIndex=0,dialogueTimer=0,cam=0,worldTime=0,toast="",toastTimer=0,adminUnlocked=false,endingStep=0,banTyped=false;
+const world={width:4600,ground:462};
+const player={x:90,y:world.ground-18,vx:0,vy:0,r:17,hp:6,maxHp:6,onGround:true,face:1,inv:0,shootCd:0,hook:null};
+const bullets=[],enemyShots=[],particles=[];
+const enemies=[
+ {x:470,min:390,max:570,y:world.ground-18,hp:3,max:3,vx:1.05,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:790,min:700,max:930,y:world.ground-18,hp:3,max:3,vx:-1.25,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:1160,min:1050,max:1280,y:world.ground-18,hp:4,max:4,vx:1.35,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:1510,min:1400,max:1640,y:world.ground-18,hp:4,max:4,vx:-1.5,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:1870,min:1760,max:1990,y:world.ground-18,hp:4,max:4,vx:1.45,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:2210,min:2110,max:2350,y:world.ground-18,hp:4,max:4,vx:-1.6,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:2570,min:2460,max:2700,y:world.ground-18,hp:5,max:5,vx:1.7,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:2910,min:2800,max:3040,y:world.ground-18,hp:5,max:5,vx:-1.65,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:3260,min:3150,max:3390,y:world.ground-18,hp:5,max:5,vx:1.75,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:3570,min:3470,max:3710,y:world.ground-18,hp:5,max:5,vx:-1.8,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:3840,min:3760,max:3970,y:world.ground-18,hp:6,max:6,vx:1.8,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0},
+ {x:4020,min:3970,max:4140,y:world.ground-18,hp:6,max:6,vx:-1.9,alive:true,type:"glitch",shotTimer:1+Math.random()*1.6,hookTimer:Math.random()*3,hook:null,vy:0}
+];
+const platforms=[
+ {x:250,y:375,w:150,h:16},{x:590,y:330,w:150,h:16},{x:900,y:375,w:160,h:16},
+ {x:1240,y:325,w:170,h:16},{x:1580,y:360,w:170,h:16},{x:1900,y:305,w:170,h:16},
+ // Parkour stretch: staggered ledges that climb, dip, and climb again.
+ {x:2220,y:390,w:125,h:16},{x:2390,y:335,w:120,h:16},{x:2560,y:275,w:120,h:16},
+ {x:2730,y:330,w:120,h:16},{x:2900,y:260,w:125,h:16},{x:3080,y:315,w:120,h:16},
+ {x:3250,y:250,w:130,h:16},{x:3440,y:315,w:140,h:16},{x:3650,y:355,w:160,h:16},
+ {x:3930,y:320,w:170,h:16},{x:4200,y:360,w:180,h:16}
+];
+const boss={x:2860,y:240,hp:36,maxHp:36,alive:true,teleport:4.8,attack:1.8,phase:0,hitFlash:0};
+let bossStarted=false;
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h)}
+function txt(s,x,y,size=16,color="#fff",align="left"){ctx.font=`bold ${size}px monospace`;ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(s,x,y)}
+function line(x1,y1,x2,y2,color,width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}
+function tee(x,y,color,accent,evil=false){
+ ctx.save();ctx.translate(x,y);ctx.fillStyle=color;ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.fill();
+ rect(-14,8,28,7,accent);rect(-9,-5,5,5,evil?"#ff183c":"#17243a");rect(5,-5,5,5,evil?"#ff183c":"#17243a");
+ if(evil){line(-12,-9,-3,-7,"#ff3c56",2);line(3,-7,12,-9,"#ff3c56",2)}
+ ctx.restore();
+}
+function startDialogue(lines,next){dialogue=lines;dialogueIndex=0;dialogueTimer=0;mode="dialogue";dialogueNext=next}
+let dialogueNext=null;
+function showToast(s,t=2){toast=s;toastTimer=t}
+function drawBackground(){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#111d33");g.addColorStop(1,"#211727");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ for(let i=0;i<44;i++){let x=((i*137-cam*.16)%(W+50)+W+50)%(W+50),y=25+(i*61)%245;rect(x,y,2,2,i%4?"#7b91b5":"#e3d8ed")}
+ for(let i=0;i<22;i++){let x=i*70-cam*.32,h=50+(i*47)%145;rect(x,world.ground-90-h,42,h,"#20283c");rect(x+9,world.ground-84-h,5,7,"#9e354f")}
+ if(player.x>650){ctx.strokeStyle="rgba(255,53,83,.24)";ctx.lineWidth=2;for(let i=0;i<10;i++){ctx.beginPath();ctx.moveTo((i*113-cam*.55)%W,0);ctx.lineTo((i*113+50-cam*.55)%W,80+(i*29)%190);ctx.stroke()}}
+}
+function drawWorld(){
+ drawBackground();
+ rect(0,world.ground,W,H-world.ground,"#29364b");
+ for(let x=-(cam%46);x<W;x+=46){rect(x,world.ground,2,80,"#53617a");rect(x+10,world.ground+18,17,3,"#151e30")}
+ platforms.forEach(p=>{rect(p.x-cam,p.y,p.w,16,"#596a83");rect(p.x-cam,p.y,p.w,4,"#b4c5db")});
+ for(let i=0;i<18;i++){let x=440+i*155-cam;if(x>-60&&x<W+60){rect(x,world.ground-48-(i%3)*19,24,48+(i%3)*19,"#383044");rect(x+7,world.ground-42-(i%3)*19,5,6,"#d54864")}}
+ enemies.forEach(e=>{if(e.alive){if(e.hook){line(e.x-cam,e.y,e.hook.x-cam,e.hook.y,"#ff8aa0",2);ctx.fillStyle="#ffd0d8";ctx.beginPath();ctx.arc(e.hook.x-cam,e.hook.y,4,0,Math.PI*2);ctx.fill()}tee(e.x-cam,e.y,"#8d2947","#f05b76",true);rect(e.x-cam-19,e.y-29,38,5,"#171d2b");rect(e.x-cam-19,e.y-29,38*(e.hp/e.max),5,"#f05b76")}});
+ if(bossStarted&&boss.alive)drawBoss();
+ if(player.hook){
+  const hx=player.hook.x-cam,hy=player.hook.y;
+  line(player.x-cam,player.y,hx,hy,"#a9e8ff",2);
+  ctx.fillStyle=player.hook.state==="attached"?"#fff1a6":"#d8f8ff";
+  ctx.beginPath();ctx.arc(hx,hy,5,0,Math.PI*2);ctx.fill();
+ }
+ tee(player.x-cam,player.y,"#d9e8f8","#73caff",false);
+ bullets.forEach(b=>{rect(b.x-cam-4,b.y-2,9,4,"#fff2a6");rect(b.x-cam-2,b.y-1,5,2,"#ffbd54")});
+ enemyShots.forEach(b=>{ctx.fillStyle="#ff4564";ctx.beginPath();ctx.arc(b.x-cam,b.y,6,0,Math.PI*2);ctx.fill()});
+ particles.forEach(a=>{ctx.globalAlpha=Math.max(0,a.life);rect(a.x-cam,a.y,3,3,a.color);ctx.globalAlpha=1});
+ drawHud();
+}
+function drawBoss(){
+ const x=boss.x-cam,y=boss.y;
+ ctx.save();ctx.globalAlpha=boss.hitFlash>0?.55:1;
+ tee(x,y,"#17131f","#b92748",true);
+ // glitch aura and floating fragments
+ for(let i=0;i<8;i++){let a=worldTime*1.6+i*Math.PI/4;rect(x+Math.cos(a)*34-3,y+Math.sin(a)*28-3,6,6,i%2?"#ff3157":"#8e4cff")}
+ ctx.restore();
+ rect(x-42,y-45,84,6,"#090b13");rect(x-42,y-45,84*(boss.hp/boss.maxHp),6,"#f34b68");
+}
+function drawHud(){
+ rect(14,13,230,66,"#070c18d9");txt("THE OLDEST ONE",26,36,14);txt("HEALTH: "+"♥ ".repeat(Math.max(0,player.hp)),26,61,15,"#ff7387");
+ txt(mode==="boss"?"FINAL BOSS: THE HACKER": "MISSION: SAVE YOUR FRIENDS",W-18,29,13,"#e0eaff","right");
+ if(mode==="boss"){rect(W/2-170,48,340,10,"#11121c");rect(W/2-170,48,340*(boss.hp/boss.maxHp),10,"#e84260");txt("THE HACKER",W/2,40,12,"#ff8292","center")}
+ if(player.hook?.state==="attached")txt("HOOKED",W/2,78,12,"#a9e8ff","center");
+ if(mode==="play"||mode==="boss"){const t=controllerLockTarget();if(t){const sx=t.x-cam;if(sx>-30&&sx<W+30){ctx.strokeStyle="#ffe27a";ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx,t.y,27,0,Math.PI*2);ctx.stroke();txt("LOCK",sx,t.y-35,10,"#ffe27a","center")}}}
+ if(toastTimer>0){rect(230,95,500,38,"#070b15e8");txt(toast,W/2,120,13,"#fff","center")}
+}
+function drawCutscene(){
+ drawBackground();rect(0,world.ground,W,H-world.ground,"#29364b");
+ tee(300,world.ground-18,"#d9e8f8","#73caff");tee(390,world.ground-18,"#8fc5a7","#b9e6c7");tee(480,world.ground-18,"#c1a3df","#e6c6ff");
+ if(dialogueIndex>=2){tee(760,world.ground-190,"#17131f","#b92748",true);txt("HACKER",760,world.ground-225,15,"#ff6279","center")}
+}
+function draw(){
+ if(mode==="dialogue"||mode==="intro")drawCutscene();else drawWorld();
+ if(mode==="dialogue"){
+  rect(35,390,890,118,"#050912ed");rect(35,390,890,3,"#e54a65");
+  const d=dialogue[dialogueIndex];txt(d.name,58,420,14,d.color||"#ff8292");wrapText(d.text,58,449,840,18,"#f2f5ff");
+  txt("CLICK / ENTER TO CONTINUE",W-55,490,10,"#a8bad2","right");
+ }
+}
+function wrapText(s,x,y,maxW,lineH,color){ctx.font="bold 15px monospace";ctx.fillStyle=color;let words=s.split(" "),lineText="",yy=y;for(let w of words){let test=lineText+w+" ";if(ctx.measureText(test).width>maxW&&lineText){ctx.fillText(lineText,x,yy);lineText=w+" ";yy+=lineH}else lineText=test}ctx.fillText(lineText,x,yy)}
+function getPad(){
+ let out={left:false,right:false,jump:false,shoot:false,hook:false,pause:false};
+ if(navigator.getGamepads)for(const pad of navigator.getGamepads()){if(!pad)continue;let ax=pad.axes?.[0]||0;out.left=ax<-.25||pad.buttons?.[14]?.pressed;out.right=ax>.25||pad.buttons?.[15]?.pressed;out.jump=!!(pad.buttons?.[0]?.pressed||pad.buttons?.[12]?.pressed);out.hook=!!pad.buttons?.[6]?.pressed;out.shoot=!!pad.buttons?.[7]?.pressed;out.pause=!!(pad.buttons?.[2]?.pressed||pad.buttons?.[3]?.pressed)}
+ return out;
+}
+let mouse={x:W/2,y:H/2,left:false,right:false};
+function worldMouse(){return {x:mouse.x+cam,y:mouse.y}}
+// Controller lock-on: R2 automatically aims at the nearest living enemy.
+// During the boss phase, the Hacker is the controller's locked target.
+function controllerLockTarget(){
+ if(mode==="boss"&&bossStarted&&boss.alive)return boss;
+ let best=null,bestD=Infinity;
+ for(const e of enemies){
+  if(!e.alive)continue;
+  const d=Math.hypot(e.x-player.x,e.y-player.y);
+  if(d<bestD){best=e;bestD=d;}
+ }
+ return best;
+}
+function shoot(controllerAim=false){
+ if(player.shootCd>0||mode!=="play"&&mode!=="boss")return;
+ const locked=controllerAim?controllerLockTarget():null;
+ const target=locked?{x:locked.x,y:locked.y}:controllerAim?{x:player.x+player.face*300,y:player.y}:worldMouse();
+ const dx=target.x-player.x,dy=target.y-player.y,len=Math.hypot(dx,dy)||1;
+ bullets.push({x:player.x+player.face*17,y:player.y,vx:dx/len*12,vy:dy/len*12,life:1.15,lockOn:!!locked});
+ player.shootCd=.18;
+}
+function controllerHookTarget(){
+ // Pick a reachable solid surface ahead of the player. Platform top faces and
+ // the ground are valid anchors; prefer nearby ledges, especially ones above.
+ const candidates=[];
+ for(const p of platforms){
+  const x=Math.max(p.x+8,Math.min(p.x+p.w-8,player.x+player.face*105));
+  const dx=x-player.x,dy=(p.y-5)-player.y,d=Math.hypot(dx,dy);
+  if(dx*player.face < -24 || d<42 || d>440 || dy>65)continue;
+  candidates.push({x,y:p.y-5,d,score:d+(dy<0?-Math.min(65,-dy)*.22:dy*.55)+(dx*player.face<0?180:0)});
+ }
+ // Ground is a fallback anchor when a ledge is not a better reachable target.
+ const gx=player.x+player.face* Math.min(400,Math.max(90,Math.abs(player.vx)*24+180));
+ const gd=Math.hypot(gx-player.x,world.ground-player.y);
+ if(gd>=42&&gd<=440)candidates.push({x:gx,y:world.ground-3,d:gd,score:gd+85});
+ candidates.sort((a,b)=>a.score-b.score);
+ return candidates[0]||null;
+}
+function hookAim(controllerAuto=false){
+ const target=controllerAuto?controllerHookTarget():(mouseMoved?worldMouse():{x:player.x+player.face*280,y:player.y-110});
+ if(!target)return {x:player.face,y:-.35};
+ const dx=target.x-player.x,dy=target.y-player.y,len=Math.hypot(dx,dy)||1;
+ return {x:dx/len,y:dy/len};
+}
+function fireHook(controllerAuto=false){
+ if(player.hook)return;
+ const dir=hookAim(controllerAuto);
+ player.hook={x:player.x+dir.x*22,y:player.y+dir.y*22,vx:dir.x*19,vy:dir.y*19,state:"flying",life:0,auto:controllerAuto};
+}
+function hookHitsSolid(x,y){
+ if(y>=world.ground)return true;
+ for(const p of platforms){if(x>=p.x&&x<=p.x+p.w&&y>=p.y-3&&y<=p.y+18)return true;}
+ return false;
+}
+function updateHook(dt,hookHeld,controllerAuto=false){
+ if(!hookHeld){player.hook=null;return}
+ if(!player.hook)fireHook(controllerAuto);
+ const h=player.hook;if(!h)return;
+ if(h.state==="flying"){
+  for(let i=0;i<3;i++){
+   h.x+=h.vx/3;h.y+=h.vy/3;h.life+=dt/3;
+   if(hookHitsSolid(h.x,h.y)){h.state="attached";h.vx=0;h.vy=0;break}
+   if(Math.hypot(h.x-player.x,h.y-player.y)>440||h.life>0.55){player.hook=null;return}
+  }
+ }else if(h.state==="attached"){
+  const dx=h.x-player.x,dy=h.y-player.y,d=Math.hypot(dx,dy)||1;
+  // Teeworlds-style hook force pulls the tee toward the anchored hook.
+  player.vx+=dx/d*0.62;player.vy+=dy/d*0.62;
+  const speed=Math.hypot(player.vx,player.vy);
+  if(speed>13){player.vx=player.vx/speed*13;player.vy=player.vy/speed*13}
+ }
+}
+let mouseMoved=false,prevPadG=false,prevPadS=false,prevPadPause=false,resumeMode="play",showControlHints=true;
+function openPause(){if(mode!=="play"&&mode!=="boss")return;resumeMode=mode;mode="paused";player.hook=null;pauseMenu.classList.remove("hide");pauseMain.classList.remove("hide");settingsPanel.classList.add("hide")}
+function closePause(){if(mode!=="paused")return;mode=resumeMode;pauseMenu.classList.add("hide")}
+function togglePause(){if(mode==="paused")closePause();else openPause()}
+function update(dt){
+ const pausePad=getPad(),pausePressed=!!(pausePad.pause);if(pausePressed&&!prevPadPause)togglePause();prevPadPause=pausePressed;
+ if(mode!=="paused")worldTime+=dt;player.shootCd=Math.max(0,player.shootCd-dt);player.inv=Math.max(0,player.inv-dt);
+ if(mode==="play"||mode==="boss"){
+  const pad=getPad(),left=keys.ArrowLeft||keys.KeyA||pad.left,right=keys.ArrowRight||keys.KeyD||pad.right,jump=keys.Space||keys.KeyW||keys.ArrowUp||pad.jump;
+  if(left){player.vx=Math.max(-5.6,player.vx-.68);player.face=-1}else if(right){player.vx=Math.min(5.6,player.vx+.68);player.face=1}else player.vx*=.84;
+  if(jump&&player.onGround){player.vy=-11.7;player.onGround=false}
+  player.vy=Math.min(13,player.vy+.48);player.x+=player.vx;player.y+=player.vy;
+  player.x=Math.max(18,Math.min(world.width-20,player.x));player.onGround=false;
+  if(player.y+17>=world.ground){player.y=world.ground-17;player.vy=0;player.onGround=true}
+  for(const a of platforms){if(player.x+14>a.x&&player.x-14<a.x+a.w&&player.y+17>=a.y&&player.y+17<=a.y+20+Math.max(0,player.vy)){player.y=a.y-17;player.vy=0;player.onGround=true}}
+  const padNow=getPad();
+  if((mouse.left||keys.KeyJ)&&player.shootCd<=0)shoot(false);
+  if(padNow.shoot&&player.shootCd<=0)shoot(true);
+  updateHook(dt,!!(mouse.right||keys.KeyK||padNow.hook),!!padNow.hook&&!mouse.right&&!keys.KeyK);
+  enemies.forEach(e=>{
+   if(!e.alive)return;
+   e.shotTimer-=dt;e.hookTimer-=dt;
+   if(e.hook){
+    e.hook.life-=dt;const dx=e.hook.x-e.x,dy=e.hook.y-e.y,d=Math.hypot(dx,dy)||1;
+    e.x+=dx/d*2.7;e.y+=dy/d*2.7;e.vy=0;if(e.hook.life<=0)e.hook=null;
+   }else{
+    e.x+=e.vx;if(e.x<e.min||e.x>e.max)e.vx*=-1;
+    e.vy=Math.min(10,(e.vy||0)+.48);e.y+=e.vy;
+    if(e.y+17>=world.ground){e.y=world.ground-18;e.vy=0}
+    for(const p of platforms){if(e.x+12>p.x&&e.x-12<p.x+p.w&&e.y+17>=p.y&&e.y+17<=p.y+20+Math.max(0,e.vy)){e.y=p.y-17;e.vy=0}}
+    if(e.hookTimer<=0){
+     e.hookTimer=3;let best=null,bestScore=Infinity;
+     for(const p of platforms){const px=Math.max(p.x,Math.min(e.x,p.x+p.w)),dx=px-e.x,dy=p.y-8-e.y,dist=Math.hypot(dx,dy);
+      if(dy<-35&&dist<310&&Math.sign(dx||e.vx)===Math.sign(e.vx)){const score=dist+Math.abs(dx)*.25;if(score<bestScore){bestScore=score;best={x:px,y:p.y-8,life:.48}}}
+     }
+     if(best)e.hook=best;
+    }
+   }
+   if(e.shotTimer<=0&&Math.abs(player.x-e.x)<620){e.shotTimer=2.1+Math.random()*.8;const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy)||1;enemyShots.push({x:e.x,y:e.y,vx:dx/d*3.35,vy:dy/d*3.35,life:3.2})}
+   if(Math.abs(e.x-player.x)<29&&Math.abs(e.y-player.y)<32&&player.inv<=0)hurtPlayer(e.x);
+  });
+  for(let i=bullets.length-1;i>=0;i--){let b=bullets[i];b.x+=b.vx;b.y+=b.vy;b.life-=dt;let hit=false;
+   enemies.forEach(e=>{if(e.alive&&Math.hypot(e.x-b.x,e.y-b.y)<24){e.hp--;hit=true;if(e.hp<=0){e.alive=false;burst(e.x,e.y,"#ff5874")}}});
+   if(bossStarted&&boss.alive&&Math.hypot(boss.x-b.x,boss.y-b.y)<32){boss.hp--;boss.hitFlash=.09;hit=true;if(boss.hp<=0)winBoss()}
+   if(hit||b.life<=0||b.x<0||b.x>world.width)bullets.splice(i,1);
+  }
+  for(let i=enemyShots.length-1;i>=0;i--){let b=enemyShots[i];b.x+=b.vx;b.y+=b.vy;b.life-=dt;if(Math.hypot(b.x-player.x,b.y-player.y)<22&&player.inv<=0){hurtPlayer(b.x);enemyShots.splice(i,1)}else if(b.life<=0)enemyShots.splice(i,1)}
+  particles.forEach(a=>{a.x+=a.vx*dt*60;a.y+=a.vy*dt*60;a.life-=dt});for(let i=particles.length-1;i>=0;i--)if(particles[i].life<=0)particles.splice(i,1);
+  cam=Math.max(0,Math.min(world.width-W,player.x-W*.36));
+  if(mode==="play"&&player.x>4260&&!bossStarted)startBoss();
+  if(mode==="play"&&player.x>world.width-100)player.x=world.width-100;
+  if(mode==="boss"&&boss.alive)updateBoss(dt);
+  if(toastTimer>0)toastTimer-=dt;
+ }
+ if(mode==="dialogue"){dialogueTimer+=dt;if(dialogueTimer>0.04)dialogueTimer=0}
+}
+function hurtPlayer(sourceX){player.hp--;player.inv=1.05;player.vx=player.x<sourceX?-7:7;player.vy=-5;player.hook=null;burst(player.x,player.y,"#79cfff");if(player.hp<=0){player.hp=player.maxHp;player.x=Math.max(60,player.x-240);showToast("THE OLDEST ONE GETS BACK UP",2)}}
+function burst(x,y,color){for(let i=0;i<9;i++)particles.push({x,y,vx:(Math.random()-.5)*5,vy:(Math.random()-.5)*5,life:.35+Math.random()*.3,color})}
+function startBoss(){
+ bossStarted=true;boss.x=cam+720;boss.y=190;boss.hp=boss.maxHp;boss.alive=true;boss.teleport=5;boss.attack=1.5;mode="boss";
+ startDialogue([
+  {name:"THE OLDEST ONE",text:"Why are you doing this to Teeworlds? Please stop it.",color:"#8fd2ff"},
+  {name:"THE HACKER",text:"NO! 1 W1LL ALWAYS DO IT BC YOU DONT UNDERSTAND WHAT THEY DID TO ME.",color:"#ff526e"},
+  {name:"THE HACKER",text:"L3AVE TEEWORLDS NOW ORELSE THE GAME W166 BE FULLY HACKED AND CURSED SO L3AVE.",color:"#ff526e"},
+  {name:"SYSTEM",text:"THE FINAL BATTLE BEGINS. SHOOT THE HACKER. KEEP MOVING.",color:"#ffe28a"}
+ ],()=>{mode="boss";showToast("FINAL BOSS: THE HACKER",2)});
+}
+function updateBoss(dt){
+ boss.teleport-=dt;boss.attack-=dt;boss.hitFlash=Math.max(0,boss.hitFlash-dt);
+ // Hacker floats and follows at a distance; teleports on a five-second cycle.
+ boss.y=175+Math.sin(worldTime*2.2)*48;
+ if(boss.teleport<=0){boss.teleport=5;boss.x=Math.max(player.x+260,Math.min(player.x+650,player.x+(Math.random()>.5?430:-300)));boss.x=Math.max(4200,Math.min(4480,boss.x));burst(boss.x,boss.y,"#d43e72");showToast("HACKER TELEPORT",.8)}
+ if(boss.attack<=0){boss.attack=1.35;let dx=player.x-boss.x,dy=player.y-boss.y,d=Math.hypot(dx,dy)||1;enemyShots.push({x:boss.x,y:boss.y,vx:dx/d*5.2,vy:dy/d*5.2,life:2.5});if(Math.random()<.35){enemyShots.push({x:boss.x,y:boss.y,vx:dx/d*4.5+1.4,vy:dy/d*4.5-1,life:2.5})}}
+ if(Math.abs(player.x-boss.x)<34&&Math.abs(player.y-boss.y)<34&&player.inv<=0)hurtPlayer(boss.x);
+ if(boss.hp<=0)winBoss();
+}
+function winBoss(){
+ if(mode==="ending"||!boss.alive)return;boss.alive=false;mode="ending";player.hook=null;enemyShots.length=0;bullets.length=0;
+ startDialogue([
+  {name:"SYSTEM",text:"HACKER DEFEATED. CORRUPTION LEVEL FALLING...",color:"#ffe28a"},
+  {name:"THE MISSING ONE",text:"WE'RE FREE! YOU ACTUALLY DID IT!",color:"#a8e8c0"},
+  {name:"THE MYSTERY ONE",text:"The cage is open. Teeworlds is coming back!",color:"#d9b7ff"},
+  {name:"THE OWNER",text:"You're very brave. Thank you so much for freeing this game from this curse.",color:"#8fd2ff"},
+  {name:"THE OWNER",text:"Now... for your prize, I will owe you admin commands except updates and others.",color:"#8fd2ff"},
+  {name:"SYSTEM",text:"THE OWNER ENTERS: /ban THE_HACKERS_NAME",color:"#ffe28a"},
+  {name:"SYSTEM",text:"THE HACKER HAS BEEN BANNED. TEEWORLDS IS SAVED.",color:"#a8e8c0"}
+ ],()=>{mode="credits";document.getElementById("endingTitle").textContent="TEE WORLDS SAVED";document.getElementById("endingText").textContent="The Missing One and the Mystery One are free. The Owner has banned THE_HACKERS_NAME. The Oldest One has earned admin commands. Thank you for saving Teeworlds.";ending.classList.remove("hide")});
+}
+function nextDialogue(){if(mode!=="dialogue")return;dialogueIndex++;if(dialogueIndex>=dialogue.length){let n=dialogueNext;dialogue=null;dialogueNext=null;if(n)n();else if(mode==="ending")mode="credits";else mode="play"}}
+canvas.addEventListener("click",e=>{if(mode==="dialogue"){nextDialogue();return}if(mode!=="play"&&mode!=="boss")return;const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;mouse.left=true;shoot();mouse.left=false});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+canvas.addEventListener("mousedown",e=>{if(e.button===2){e.preventDefault();const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;mouseMoved=true;mouse.right=true}});
+canvas.addEventListener("mousemove",e=>{const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;mouseMoved=true});
+canvas.addEventListener("mouseup",e=>{if(e.button===2){mouse.right=false;player.hook=null}});
+window.addEventListener("keydown",e=>{keys[e.code]=true;if(["ArrowLeft","ArrowRight","ArrowUp","Space"].includes(e.code))e.preventDefault();if(e.code==="Escape"){e.preventDefault();if(mode==="paused")closePause();else if(mode==="play"||mode==="boss")openPause();return}if(e.code==="KeyJ"&&(mode==="play"||mode==="boss"))shoot();if(e.code==="Enter"&&mode==="dialogue")nextDialogue();if(e.code==="F8"){e.preventDefault();admin.style.display=admin.style.display==="block"?"none":"block";if(admin.style.display==="block"&&!adminUnlocked)pass.focus();else if(adminUnlocked)adminInput.focus()}});
+window.addEventListener("keyup",e=>{keys[e.code]=false;if(e.code==="KeyK")player.hook=null});
+document.getElementById("start").onclick=()=>{intro.classList.add("hide");startDialogue([
+ {name:"THE MISSING ONE",text:"This is the best day ever. Just us, playing Teeworlds!",color:"#a8e8c0"},
+ {name:"THE MYSTERY ONE",text:"Hey! Who is that standing over there?",color:"#d9b7ff"},
+ {name:"THE HACKER",text:"L3AVE THE GAME NOW OR YOU W166 BE HACKED.",color:"#ff526e"},
+ {name:"THE OLDEST ONE",text:"RUN!"},
+ {name:"THE HACKER",text:"L3AVE NOW. 111011101100000111111110000000000000011. L3AVE TEEWORLDS NOW ORELSE THE GAME W166 BE FULLY HACKED AND CURSED SO L3AVE.",color:"#ff526e"},
+ {name:"SYSTEM",text:"The Hacker catches the Missing One and the Mystery One. The screen goes dark...",color:"#ffe28a"},
+ {name:"SYSTEM",text:"ONE SECOND LATER — THE OLDEST ONE WAKES UP IN THE CORRUPTED WORLD.",color:"#ffe28a"}
+ ],()=>{mode="play";player.x=90;player.y=world.ground-18;showToast("MISSION: CROSS THE EXPANDED WORLD",3)})};
+document.getElementById("resumeGame").onclick=closePause;
+document.getElementById("openSettings").onclick=()=>{pauseMain.classList.add("hide");settingsPanel.classList.remove("hide")};
+document.getElementById("backSettings").onclick=()=>{settingsPanel.classList.add("hide");pauseMain.classList.remove("hide")};
+document.getElementById("toggleHints").onclick=()=>{showControlHints=!showControlHints;document.getElementById("help").style.display=showControlHints?"block":"none";document.getElementById("toggleHints").textContent=showControlHints?"HIDE CONTROL HINTS":"SHOW CONTROL HINTS"};
+document.getElementById("leaveGame").onclick=()=>{pauseMenu.classList.add("hide");settingsPanel.classList.add("hide");pauseMain.classList.remove("hide");mode="intro";intro.classList.remove("hide")};
+document.getElementById("restartGame").onclick=()=>{window.location.reload()};
+document.getElementById("continueEnd").onclick=()=>{ending.classList.add("hide");mode="credits";showToast("THANK YOU FOR PLAYING SAVING TEEWORLDS",5)};
+document.getElementById("unlock").onclick=()=>{if(pass.value==="gugugaga67"){adminUnlocked=true;adminTools.classList.remove("hide");adminLog.textContent="ACCESS GRANTED. Welcome, Owner. Type help.";pass.value="";adminInput.focus()}else{adminTools.classList.remove("hide");adminLog.textContent="ACCESS DENIED."}};
+function runCommand(){if(!adminUnlocked)return;const a=adminInput.value.trim().split(/\s+/),c=(a[0]||"").toLowerCase();adminInput.value="";const say=s=>{adminLog.textContent+="\n"+s;adminLog.scrollTop=adminLog.scrollHeight};
+ if(c==="help")say("Commands: help, heal, fly, teleport <x>, ban <name>, status");
+ else if(c==="heal"){player.hp=player.maxHp;say("Health restored.")}
+ else if(c==="fly"){player.adminFly=!player.adminFly;say("Prototype admin flight toggle is "+(player.adminFly?"ON":"OFF"))}
+ else if(c==="teleport"&&Number.isFinite(Number(a[1]))){player.x=Math.max(20,Math.min(world.width-20,Number(a[1])));say("Teleported to "+Math.round(player.x))}
+ else if(c==="ban")say("Story ban command recorded for "+(a[1]||"THE_HACKERS_NAME")+". No real online accounts are connected.")
+ else if(c==="status")say("Mode: "+mode+" | X: "+Math.round(player.x)+" | HP: "+player.hp);
+ else say("Unknown command. Type help.");
+}
+document.getElementById("runCommand").onclick=runCommand;adminInput.addEventListener("keydown",e=>{if(e.key==="Enter")runCommand()});pass.addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("unlock").click()});
+let last=performance.now();function frame(now){let dt=Math.min(.033,(now-last)/1000);last=now;update(dt);draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+})();
+</script></body></html>
